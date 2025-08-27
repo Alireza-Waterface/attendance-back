@@ -1,9 +1,9 @@
 # سامانه حضور و غیاب دانشگاه - بخش بک‌اند (Backend)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Node.js-18.x-339933.svg?style=for-the-badge&logo=node.js" alt="Node.js Version">
+  <img src="https://img.shields.io/badge/Node.js-24.x-339933.svg?style=for-the-badge&logo=node.js" alt="Node.js Version">
   <img src="https://img.shields.io/badge/Express.js-4.x-000000.svg?style=for-the-badge&logo=express" alt="Express.js">
-  <img src="https://img.shields.io/badge/MongoDB-6.x-47A248.svg?style=for-the-badge&logo=mongodb" alt="MongoDB">
+  <img src="https://img.shields.io/badge/MongoDB-8.x-47A248.svg?style=for-the-badge&logo=mongodb" alt="MongoDB">
   <img src="https://img.shields.io/badge/JWT-Auth-d63aff.svg?style=for-the-badge&logo=json-web-tokens" alt="JWT Auth">
 </p>
 
