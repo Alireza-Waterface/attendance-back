@@ -1,0 +1,23 @@
+# Node.js dependencies
+/node_modules
+
+# Environment variables - VERY IMPORTANT
+.env
+
+# Log files
+/logs
+/docs
+
+# Uploaded files (user-generated content)
+/uploads
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Build output (if any)
+/dist
+
+# IDE / Editor specific files
+.vscode/
+.idea/
