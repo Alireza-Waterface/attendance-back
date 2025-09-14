@@ -5,39 +5,35 @@ from sklearn.cluster import KMeans
 from sklearn.impute import SimpleImputer
 import joblib
 import os
+import sys
 import numpy as np
 
 # --- تنظیمات ---
 MONGO_URI = "mongodb://localhost:27017/attendance_system"
 DB_NAME = "attendance_system"
-MODEL_PATH = "models"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(SCRIPT_DIR, "models")
 MODEL_FILENAME = os.path.join(MODEL_PATH, "employee_clustering_model.joblib")
 SCALER_FILENAME = os.path.join(MODEL_PATH, "employee_clustering_scaler.joblib")
+IMPUTER_FILENAME = os.path.join(MODEL_PATH, "employee_clustering_imputer.joblib")
 N_CLUSTERS = 3 # تعداد خوشه‌های مورد نظر (مثلا: منظم، شناور، در معرض خطر)
 
 def fetch_data():
-    """ داده‌ها را از MongoDB استخراج و به DataFrame تبدیل می‌کند """
+    """ Fetches and aggregates data from MongoDB. """
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
     
     pipeline = [
-        # فقط رکوردهایی که ورود و خروج کامل دارند
+        # Match only records with complete check-in and check-out
         {'$match': {'checkIn': {'$exists': True}, 'checkOut': {'$exists': True}}},
-        # محاسبه ساعات کاری و ساعت ورود
-        {'$project': {
-            'user': 1,
-            'status': 1,
-            'work_duration_hours': {'$divide': [{'$subtract': ['$checkOut', '$checkIn']}, 3600000]},
-            'checkin_hour': {'$hour': {'date': '$checkIn', 'timezone': 'Asia/Tehran'}}
-        }},
-        # گروه‌بندی بر اساس کاربر و محاسبه میانگین‌ها
+        # Group by user and calculate core metrics
         {'$group': {
             '_id': '$user',
-            'avg_checkin_hour': {'$avg': '$checkin_hour'},
-            'avg_work_duration': {'$avg': '$work_duration_hours'},
+            'avg_checkin_hour': {'$avg': {'$hour': {'date': '$checkIn', 'timezone': 'Asia/Tehran'}}},
+            'avg_work_duration': {'$avg': {'$divide': [{'$subtract': ['$checkOut', '$checkIn']}, 3600000]}},
             'total_lates': {'$sum': {'$cond': [{'$eq': ['$status', 'تاخیر']}, 1, 0]}}
         }},
-        # پیوستن به اطلاعات کاربر برای دریافت نام
+        # Join with user info
         {'$lookup': {
             'from': 'users',
             'localField': '_id',
@@ -45,6 +41,9 @@ def fetch_data():
             'as': 'userInfo'
         }},
         {'$unwind': '$userInfo'},
+        {'$match': {
+            'userInfo.roles': 'کارمند'
+        }},
         {'$project': {
             'user_id': '$_id',
             'fullName': '$userInfo.fullName',
@@ -90,7 +89,7 @@ def train_and_save_model(df):
     os.makedirs(MODEL_PATH, exist_ok=True)
     joblib.dump(kmeans, MODEL_FILENAME)
     joblib.dump(scaler, SCALER_FILENAME)
-    joblib.dump(imputer, os.path.join(MODEL_PATH, "employee_clustering_imputer.joblib"))
+    joblib.dump(imputer, IMPUTER_FILENAME)
     
     print(f"Clustering model trained successfully and saved to {MODEL_FILENAME}.")
 

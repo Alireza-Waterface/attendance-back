@@ -2,17 +2,67 @@ import pandas as pd
 import joblib
 import json
 import io
+import os
 import sys
-from train_clustering_model import fetch_data # از اسکریپت قبلی تابع را وارد می‌کنیم
+from pymongo import MongoClient
+
+MONGO_URI = "mongodb://localhost:27017/attendance_system"
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(SCRIPT_DIR, "models")
+DB_NAME = "attendance_system"
+MODEL_FILENAME = os.path.join(MODEL_PATH, 'employee_clustering_model.joblib')
+SCALER_FILENAME = os.path.join(MODEL_PATH, 'employee_clustering_scaler.joblib')
+IMPUTER_FILENAME = os.path.join(MODEL_PATH, 'employee_clustering_imputer.joblib')
+
+def fetch_data():
+    """ Fetches and aggregates data from MongoDB. """
+    client = MongoClient(MONGO_URI)
+    db = client[DB_NAME]
+    
+    pipeline = [
+        # Match only records with complete check-in and check-out
+        {'$match': {'checkIn': {'$exists': True}, 'checkOut': {'$exists': True}}},
+        # Group by user and calculate core metrics
+        {'$group': {
+            '_id': '$user',
+            'avg_checkin_hour': {'$avg': {'$hour': {'date': '$checkIn', 'timezone': 'Asia/Tehran'}}},
+            'avg_work_duration': {'$avg': {'$divide': [{'$subtract': ['$checkOut', '$checkIn']}, 3600000]}},
+            'total_lates': {'$sum': {'$cond': [{'$eq': ['$status', 'تاخیر']}, 1, 0]}}
+        }},
+        # Join with user info
+        {'$lookup': {
+            'from': 'users',
+            'localField': '_id',
+            'foreignField': '_id',
+            'as': 'userInfo'
+        }},
+        {'$unwind': '$userInfo'},
+        {'$match': {
+            'userInfo.roles': 'کارمند'
+        }},
+        {'$project': {
+            'user_id': '$_id',
+            'fullName': '$userInfo.fullName',
+            'avg_checkin_hour': 1,
+            'avg_work_duration': 1,
+            'total_lates': 1,
+            '_id': 0
+        }}
+    ]
+    
+    data = list(db.attendances.aggregate(pipeline))
+    client.close()
+    return pd.DataFrame(data)
 
 def predict_clusters():
     """ مدل را بارگذاری کرده و خوشه‌ها را برای داده‌های فعلی پیش‌بینی می‌کند """
     try:
-        kmeans = joblib.load('models/employee_clustering_model.joblib')
-        scaler = joblib.load('models/employee_clustering_scaler.joblib')
-        imputer = joblib.load('models/employee_clustering_imputer.joblib')
-    except FileNotFoundError:
-        return {"error": "مدل آموزش‌دیده یافت نشد. لطفاً ابتدا مدل را آموزش دهید."}
+        kmeans = joblib.load(MODEL_FILENAME)
+        scaler = joblib.load(SCALER_FILENAME)
+        imputer = joblib.load(IMPUTER_FILENAME)
+    except FileNotFoundError as e:
+        return {"error": f"Model file not found. Please train the model first. Details: {e}"}
 
     df = fetch_data()
     if df.empty:
@@ -24,6 +74,8 @@ def predict_clusters():
     
     # پیش‌بینی خوشه‌ها
     df['cluster'] = kmeans.predict(scaled_features)
+
+    df['user_id'] = df['user_id'].astype(str)
     
     # آماده‌سازی خروجی JSON
     # می‌توانیم به هر خوشه یک برچسب معنایی بدهیم

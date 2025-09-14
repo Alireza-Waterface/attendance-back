@@ -7,7 +7,8 @@ import os
 # --- تنظیمات ---
 MONGO_URI = "mongodb://localhost:27017/attendance_system"
 DB_NAME = "attendance_system"
-MODEL_PATH = "models"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(SCRIPT_DIR, "models")
 MODEL_FILENAME = os.path.join(MODEL_PATH, "attendance_anomaly_model.joblib")
 # ویژگی‌هایی که رفتار یک روز کاری را توصیف می‌کنند
 FEATURES = ['checkin_hour', 'checkin_minute', 'work_duration_hours']
@@ -27,7 +28,7 @@ def fetch_and_prepare_data():
             'from': 'users', 'localField': 'user', 'foreignField': '_id', 'as': 'userInfo'
         }},
         {'$unwind': '$userInfo'},
-        {'$match': {'userInfo.employeeType': 'اداری'}},
+        {'$match': {'userInfo.roles': 'کارمند'}},
         # استخراج ویژگی‌های مورد نیاز
         {'$project': {
             'checkin_hour': {'$hour': {'date': '$checkIn', 'timezone': 'Asia/Tehran'}},
