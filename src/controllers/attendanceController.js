@@ -52,10 +52,10 @@ const updateAttendance = catchAsync(async (req, res, next) => {
 
 const getRecordsByRecorder = catchAsync(async (req, res, next) => {
   const recorderId = req.user.id;
-  const { sortBy, role } = req.query;
+  const { sortBy, role, search = '', page = 1, limit = 10 } = req.query;
 
   try {
-    const records = await attendanceService.getRecordsByRecorderToday({recorderId, sortBy, role});
+    const records = await attendanceService.getRecordsByRecorderToday({recorderId, sortBy, role, search, page, limit});
 
     res.status(200).json({
       success: true,

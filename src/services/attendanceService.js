@@ -362,7 +362,17 @@ const updateAttendanceRecord = async (recordId, updateData, currentUser) => {
 	return record;
 };
 
-const getRecordsByRecorderToday = async ({ recorderId, sortBy, role }) => {
+const getRecordsByRecorderToday = async ({
+	recorderId,
+	sortBy,
+	role,
+	search,
+	page,
+	limit,
+}) => {
+	const pageInt = parseInt(page, 10);
+	const limitInt = parseInt(limit, 10);
+	const skip = (pageInt - 1) * limitInt;
 	const todayJalali = moment().format("jYYYY/jMM/jDD");
 
 	let sortOption = { createdAt: -1 };
@@ -382,29 +392,59 @@ const getRecordsByRecorderToday = async ({ recorderId, sortBy, role }) => {
 		{ $unwind: "$userInfo" },
 	];
 
+	const postLookupMatchStage = {};
 	if (role && role !== "all") {
-		aggregationPipeline.push({
-			$match: { "userInfo.roles": role },
-		});
+		postLookupMatchStage["userInfo.roles"] = role;
+	}
+	if (search) {
+		postLookupMatchStage["$or"] = [
+			{ "userInfo.fullName": { $regex: search, $options: "i" } },
+			{ "userInfo.personnelCode": { $regex: search, $options: "i" } },
+			{ "userInfo.nationalCode": { $regex: search, $options: "i" } },
+		];
+	}
+	if (Object.keys(postLookupMatchStage).length > 0) {
+		aggregationPipeline.push({ $match: postLookupMatchStage });
 	}
 
 	aggregationPipeline.push({
-		$project: {
-			_id: 1,
-			checkIn: 1,
-			checkOut: 1,
-			status: 1,
-			isJustified: 1,
-			user: {
-				_id: "$userInfo._id",
-				fullName: "$userInfo.fullName",
-				roles: "$userInfo.roles",
-			},
+		$facet: {
+			metadata: [{ $count: "totalDocs" }],
+			docs: [
+				{ $skip: skip },
+				{ $limit: limitInt },
+				// Project the final shape after pagination
+				{
+					$project: {
+						_id: 1,
+						checkIn: 1,
+						checkOut: 1,
+						status: 1,
+						user: {
+							_id: "$userInfo._id",
+							fullName: "$userInfo.fullName",
+							roles: "$userInfo.roles",
+						},
+					},
+				},
+			],
 		},
 	});
 
-	const records = await Attendance.aggregate(aggregationPipeline);
-	return records;
+	const result = await Attendance.aggregate(aggregationPipeline);
+
+	const docs = result[0]?.docs || [];
+	const totalDocs = result[0]?.metadata[0]?.totalDocs || 0;
+
+	return {
+		docs,
+		totalDocs,
+		limit: limitInt,
+		page: pageInt,
+		totalPages: Math.ceil(totalDocs / limitInt),
+		hasNextPage: pageInt < Math.ceil(totalDocs / limitInt),
+		hasPrevPage: pageInt > 1,
+	};
 };
 
 const deleteAttendanceRecord = async (recordId, currentUser) => {
