@@ -20,9 +20,8 @@ const generateAttendanceExcel = async (data) => {
     { header: 'تاریخ', key: 'date', width: 15 },
     { header: 'ساعت ورود', key: 'checkIn', width: 15 },
     { header: 'ساعت خروج', key: 'checkOut', width: 15 },
-    { header: 'وضعیت', key: 'status', width: 15 },
     { header: 'موجه', key: 'isJustified', width: 10 },
-    { header: 'توضیحات', key: 'justificationNotes', width: 30 },
+    { header: 'توضیحات', key: 'justificationNotes', width: 50 },
     { header: 'ثبت‌کننده', key: 'recordedBy', width: 25 },
   ];
 
@@ -45,7 +44,6 @@ const generateAttendanceExcel = async (data) => {
       date: record.date,
       checkIn: record.checkIn ? moment(record.checkIn).format('HH:mm:ss') : '-',
       checkOut: record.checkOut ? moment(record.checkOut).format('HH:mm:ss') : '-',
-      status: record.status,
       isJustified: record.isJustified ? 'بله' : 'خیر',
       justificationNotes: record.justificationNotes,
       recordedBy: `${record.recordedBy.fullName} - ${record.recordedBy.personnelCode || record.recordedBy.nationalCode}`,
