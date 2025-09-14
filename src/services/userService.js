@@ -21,10 +21,15 @@ const getUserProfile = async (userId) => {
 };
 
 const createUser = async (userData) => {
-	const { roles, personnelCode, nationalCode } = userData;
+	const {
+		roles,
+		personnelCode,
+		nationalCode,
+		departments: departmentNames,
+	} = userData;
 
 	const isStaffBased = roles.some((role) =>
-		["اداری", "مدیر", "مسئول"].includes(role)
+		["کارمند", "مدیر", "مسئول"].includes(role)
 	);
 	const isFacultyBased = roles.some((role) =>
 		["استاد", "هیات_علمی"].includes(role)
@@ -68,10 +73,21 @@ const createUser = async (userData) => {
 	}
 
 	// ۳. ایجاد کاربر
-	// ما دیگر نیازی به employeeType نداریم و آن را از userData حذف می‌کنیم تا در دیتابیس ذخیره نشود
 	const { ...dataToCreate } = userData;
 
-	const user = await User.create(dataToCreate);
+	if (departmentNames && departmentNames.length > 0) {
+		const count = await Department.countDocuments({
+			name: { $in: departmentNames },
+		});
+		if (count !== departmentNames.length) {
+			throw new AppError("یک یا چند واحد انتخاب شده نامعتبر است.", 400);
+		}
+	}
+
+	const user = await User.create({
+		...dataToCreate,
+		departments: departmentNames || [],
+	});
 
 	// حذف پسورد از آبجکت خروجی
 	user.password = undefined;
@@ -199,6 +215,17 @@ const updateUserById = async (userId, updateData, adminUser) => {
 		throw new Error("هیچ اطلاعات معتبری برای به‌روزرسانی ارسال نشده است.");
 	}
 
+	if (updateData.departments) {
+		const count = await Department.countDocuments({
+			name: { $in: updateData.departments },
+		});
+		if (count !== updateData.departments.length) {
+			throw new AppError("یک یا چند واحد انتخاب شده نامعتبر است.", 400);
+		}
+		updateData.departments = updateData.departments;
+		delete updateData.departments;
+	}
+
 	const updatedUser = await User.findByIdAndUpdate(
 		userId,
 		{ $set: updates },
@@ -290,66 +317,6 @@ const deleteUser = async (userId, currentUser) => {
 
 	await User.findByIdAndDelete(userId);
 };
-
-// const getPublicUserList = async (filters) => {
-//   // --- Create the date range for today ---
-//   const startOfToday = moment().startOf('jDay').toDate();
-//   const endOfToday = moment().endOf('jDay').toDate();
-
-//   // --- Log the date range to be 100% sure it's correct ---
-//   logger.debug(`--- DIAGNOSTIC MODE: LOOKUP TEST ---`);
-//   logger.debug(`Searching for attendance records between: ${startOfToday.toISOString()} AND ${endOfToday.toISOString()}`);
-
-//   const diagnosticPipeline = [
-//     // 1. Get ONLY ONE specific user that you KNOW has a check-in today.
-//     // Replace this ID with a real user ID from your database.
-//     {
-//       $match: {
-//         _id: new mongoose.Types.ObjectId('689612cf36ba541c1a59b68a') // PASTE A REAL USER ID HERE
-//       }
-//     },
-
-//     // 2. Perform ONLY the lookup operation.
-//     {
-//       $lookup: {
-//         from: 'attendances',
-//         let: { userId: '$_id' },
-//         pipeline: [
-//           {
-//             $match: {
-//               $expr: {
-//                 $and: [
-//                   { $eq: ['$user', '$$userId'] },
-//                   { $gte: ['$createdAt', startOfToday] },
-//                   { $lte: ['$createdAt', endOfToday] }
-//                 ],
-//               },
-//             },
-//           },
-//         ],
-//         as: 'todayAttendance', // The result will be in this field
-//       },
-//     },
-
-//     // 3. Project the result so we can see what the lookup found.
-//     {
-//         $project: {
-//             _id: 1,
-//             fullName: 1,
-//             todayAttendance: 1 // We want to see the entire content of this array
-//         }
-//     }
-//   ];
-
-//   const result = await User.aggregate(diagnosticPipeline);
-
-//   // --- Log the raw result of the aggregation ---
-//   logger.debug(`Raw aggregation result: ${JSON.stringify(result, null, 2)}`);
-
-//   // We will just return this raw result for now.
-//   // The structure will be different, but it's for debugging.
-//   return { docs: result, totalDocs: result.length };
-// };
 
 const getPublicUserList = async (filters) => {
 	const { search, page = 1, limit = 10, date } = filters;

@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
   departments: [{
     type: String,
     required: true,
+    default: [],
   }],
   roomLocation: { type: String, trim: true },
   avatar: { type: String, default: 'uploads/default-avatar.webp' },
