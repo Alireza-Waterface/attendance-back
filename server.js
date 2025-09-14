@@ -13,7 +13,12 @@ const logger = require("./src/config/logger");
 
 const cookieParser = require("cookie-parser");
 
-const { loadSettings, attachSettings } = require('./src/middleware/settingsLoader');
+const {
+	loadSettings,
+	attachSettings,
+} = require("./src/middleware/settingsLoader");
+
+const { scheduleJobs } = require("./src/services/schedulerService");
 
 // Import routes
 const authRoutes = require("./src/routes/auth");
@@ -119,13 +124,15 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
-   await loadSettings();
+	await loadSettings();
 
-   app.listen(PORT, () => {
-      logger.info(`🚀 Server running on port: ${PORT}`);
-      logger.info(`🌍 Environment: ${process.env.NODE_ENV}`);
-      logger.info(`📊 Health Check: http://localhost:${PORT}/health`);
-   });
+	scheduleJobs();
+
+	app.listen(PORT, () => {
+		logger.info(`🚀 Server running on port: ${PORT}`);
+		logger.info(`🌍 Environment: ${process.env.NODE_ENV}`);
+		logger.info(`📊 Health Check: http://localhost:${PORT}/health`);
+	});
 };
 
 startServer();
